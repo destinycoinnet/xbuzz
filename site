@@ -1,0 +1,242 @@
+Hridoy, [5/30/2025 11:42 PM]
+mkdir betting-site
+cd betting-site
+
+Hridoy, [5/30/2025 11:42 PM]
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const authRoutes = require('./routes/auth');
+const walletRoutes = require('./routes/wallet');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/wallet', walletRoutes);
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true, useUnifiedTopology: true,
+}).then(() => console.log('MongoDB connected'))
+  .catch(err => console.error(err));
+
+app.listen(5000, () => console.log('Server running on port 5000'));
+
+Hridoy, [5/30/2025 11:43 PM]
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+  balance: { type: Number, default: 1000 },
+});
+
+module.exports = mongoose.model('User', userSchema);
+
+Hridoy, [5/30/2025 11:44 PM]
+const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const router = express.Router();
+
+router.post('/register', async (req, res) => {
+  const { name, email, password } = req.body;
+  const hashed = await bcrypt.hash(password, 10);
+  try {
+    const user = await User.create({ name, email, password: hashed });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: 'Email already exists' });
+  }
+});
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || !(await bcrypt.compare(password, user.password)))
+    return res.status(401).json({ error: 'Invalid credentials' });
+
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+  res.json({ token, user: { name: user.name, email: user.email, balance: user.balance } });
+});
+
+module.exports = router;
+
+Hridoy, [5/30/2025 11:45 PM]
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const router = express.Router();
+
+function auth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.sendStatus(403);
+  jwt.verify(token, process.env.JWT_SECRET, (err, data) => {
+    if (err) return res.sendStatus(403);
+    req.userId = data.id;
+    next();
+  });
+}
+
+router.get('/', auth, async (req, res) => {
+  const user = await User.findById(req.userId);
+  res.json({ balance: user.balance });
+});
+
+router.post('/deposit', auth, async (req, res) => {
+  const user = await User.findById(req.userId);
+  user.balance += req.body.amount;
+  await user.save();
+  res.json({ balance: user.balance });
+});
+
+router.post('/bet', auth, async (req, res) => {
+  const user = await User.findById(req.userId);
+  const { amount } = req.body;
+  if (user.balance < amount) return res.status(400).json({ error: 'Insufficient funds' });
+  user.balance -= amount;
+  await user.save();
+  res.json({ balance: user.balance });
+});
+
+module.exports = router;
+
+Hridoy, [5/30/2025 11:46 PM]
+MONGO_URI=your-mongo-uri-here
+JWT_SECRET=your-secret-here
+{
+  "name": "betting-backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.5.0"
+  }
+}
+Hridoy, [5/30/2025 11:48 PM]
+import React from 'react';
+import './index.css';
+
+function App() {
+  return (
+    <div className="app">
+      <header>
+        <h1>Bet on All Your Favorite Sports</h1>
+        <button className="btn">Bet Now</button>
+      </header>
+
+      <section className="events">
+        <h2>Top Events</h2>
+        <div className="event">
+          <span>Team A vs Team B</span>
+          <span>Odds: 1.55</span>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default App;
+
+Hridoy, [5/30/2025 11:48 PM]
+body {
+  margin: 0;
+  background: #1e0050;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  text-align: center;
+  padding: 20px;
+}
+
+.btn {
+  background: #f500a0;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+}
+
+.events {
+  padding: 20px;
+}
+
+.event {
+  background: #330070;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+Hridoy, [5/30/2025 11:49 PM]
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+Hridoy, [5/30/2025 11:49 PM]
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Betting Site</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+
+Hridoy, [5/30/2025 11:49 PM]
+{
+  "name": "betting-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  }
+}
+
+Hridoy, [5/30/2025 11:49 PM]
+# 🏆 Betting Website Project
+
+This is a simple betting site with:
+- React frontend
+- Node.js backend
+- MongoDB (via MongoDB Atlas)
+- JWT auth and wallet simulation
+
+## 🚀 Run locally
+
+### Backend
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Add your real MONGO_URI and JWT_SECRET in .env
+npm start
+
+Hridoy, [5/30/2025 11:49 PM]
+cd frontend
+npm install
+npm start
